@@ -7,6 +7,10 @@ const defaultConfig = {
     bgColor: 0x424242,
     fogFactor: 0.5,
     renderDistance: 100,
+    ambientColor: 0xffffff,
+    ambientIntensity: 0.5,
+    lightColor: 0xffffff,
+    lightIntensity: 0.5,
 
     /**
      * Camera configs
@@ -212,12 +216,17 @@ class Vis3D {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(config.bgColor);
         this.scene.fog = new THREE.Fog(
-            new THREE.Color(config.bgColor), config.near, 
-            config.renderDistance*config.fogFactor
+            new THREE.Color(config.bgColor),
+            config.renderDistance*config.fogFactor, 
+            config.renderDistance 
         );
 
-        this.ambientLight = new THREE.AmbientLight( 0xffffff, 0.15 );
-        this.directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+        this.ambientLight = new THREE.AmbientLight( 
+            config.ambientColor, config.ambientIntensity 
+        );
+        this.directionalLight = new THREE.DirectionalLight(
+            config.lightColor, config.lightIntensity
+        );
         this.scene.add(this.ambientLight);
         this.scene.add(this.directionalLight);
 
@@ -242,22 +251,6 @@ class Vis3D {
          */
     }
 
-    makeGroundPlane(size=200) {
-        const geometry = new THREE.PlaneGeometry(size, size, size, size);
-        const wireframe = new THREE.WireframeGeometry( geometry );
-        const line = new THREE.LineSegments( wireframe );
-        line.material.ztest = false;
-        line.material.opacity = 0.2;
-        line.material.transparent = true;
-        return line;
-    }
-
-    makeDefaultCube(size=2) {
-        const geometry = new THREE.BoxGeometry(size, size, size);
-        const material = new THREE.MeshStandardMaterial();
-        return new THREE.Mesh( geometry, material );
-    }
-
     getColor(data) {
         let c;
         if (data instanceof Array) {
@@ -273,21 +266,47 @@ class Vis3D {
         return c;
     }
 
+    makeGroundPlane(size=200) {
+        const geometry = new THREE.PlaneGeometry(size, size, size, size);
+        const wireframe = new THREE.WireframeGeometry( geometry );
+        const position = wireframe.getAttribute('position').array;
+        const newPosition = new Float32Array(position.length-size*size*6);
+        for (let i = 0, j = 0; i < position.length; i += 6) {
+            if (position[i] == position[i+3] || position[i+1] == position[i+4]) {
+                newPosition.set(position.slice(i, i+6), j);
+                j += 6;
+            }
+        }
+        wireframe.setAttribute(
+            'position', new THREE.BufferAttribute(newPosition, 3)
+        );
+        const line = new THREE.LineSegments( wireframe );
+        line.material.ztest = false;
+        line.material.opacity = 0.1;
+        line.material.transparent = true;
+        return line;
+    }
+
+    makeDefaultCube(size=2) {
+        const geometry = new THREE.BoxGeometry(size, size, size);
+        const material = new THREE.MeshStandardMaterial();
+        return new THREE.Mesh( geometry, material );
+    }
+
     makePointCloud(data) {
         const points = new Float32Array(data.points.flat());
-        const colorArray = [];
+        const color = new Float32Array(points.length * 3)
         if (data.color instanceof Array) {
-            for (let i = 0; i < data.color.length; ++i) {
+            for (let i = 0; i < points.length; ++i) {
                 const c = this.getColor(data.color[i]);
-                colorArray.push(c.r, c.g, c.b);
+                color.set([ c.r, c.g, c.b ], 3*i);
             }
         } else {
             const c = this.getColor(data.color);
             for (let i = 0; i < points.length; ++i) {
-                colorArray.push(c.r, c.g, c.b);
+                color.set([ c.r, c.g, c.b ], 3*i);
             }
         }
-        const color = new Float32Array(colorArray);
 
 
         const geometry = new THREE.BufferGeometry();
@@ -302,16 +321,64 @@ class Vis3D {
         return new THREE.Points(geometry, material);
     }
 
+    makeBBox7(data) {
+        /**
+         * (x, y, z, xs, ys, zs, rot_z)
+         */
+        const bbox = data.bbox;
+        const geometry = new THREE.BufferGeometry();
+        const x = bbox[0], y = bbox[1], z = bbox[2],
+              xs2 = bbox[3]/2, ys2 = bbox[4]/2, zs2 = bbox[5]/2, rot = data[6];
+        const xmin = x - xs2, xmax = x + xs2,
+              ymin = y - ys2, ymax = y + ys2,
+              zmin = z - zs2, zmax = z + zs2;
+        const vertices = new Float32Array([
+            xmin, ymin, zmin, xmax, ymin, zmin,
+            xmax, ymin, zmin, xmax, ymax, zmin,
+            xmax, ymax, zmin, xmin, ymax, zmin,
+            xmin, ymax, zmin, xmin, ymin, zmin,
+            xmin, ymin, zmax, xmax, ymin, zmax,
+            xmax, ymin, zmax, xmax, ymax, zmax,
+            xmax, ymax, zmax, xmin, ymax, zmax,
+            xmin, ymax, zmax, xmin, ymin, zmax,
+            xmin, ymin, zmin, xmin, ymin, zmax,
+            xmax, ymin, zmin, xmax, ymin, zmax,
+            xmax, ymax, zmin, xmax, ymax, zmax,
+            xmin, ymax, zmin, xmin, ymax, zmax
+        ]);
+        geometry.setAttribute('position', vertices);
+        geometry.rotateZ(rot);
+        let material;
+        if (data.dashed) {
+            material = new LineDashedMaterial({
+                color: this.getColor(data.color),
+                linewidth: data.linewidth,
+                scale: data.scale,
+                dashSize: data.dashsize,
+                gapSize: data.gapsize
+            })
+        } else {
+            material = new LineBasicMaterial({
+                color: this.getColor(data.color),
+                linewidth: data.linewidth
+            })
+        }
+        return new LineSegments(geometry, material);
+    }
+
     makeObject(obj) {
         switch (obj.type) {
             case 'GroundPlane':
-                obj.obj = this.makeGroundPlane(this.config.renderDistance * 2);
+                obj.obj = this.makeGroundPlane(this.config.renderDistance*4);
                 break;
             case 'DefaultCube':
                 obj.obj = this.makeDefaultCube();
                 break;
             case 'PointCloud':
                 obj.obj = this.makePointCloud(obj.data);
+                break;
+            case 'BBox7':
+                obj.obj = this.makeBBox7(obj.data);
                 break;
             default:
                 throw 'Unknown object type: ' + obj.type;
@@ -354,10 +421,38 @@ class Vis3D {
         }
     }
 
+    showAll() {
+        const showGround = this.groundPlane.show;
+        for (const uuid in this.objects) {
+            if (uuid != this.groundPlane.uuid || showGround)
+                this.show(uuid);
+        }
+    }
+
+    showOnly(uuid) {
+        if (uuid in this.objects) {
+            const showGround = this.groundPlane.show;
+            for (const i in this.objects) {
+                if (i != uuid && this.objects[i].show && 
+                    (i != this.groundPlane.uuid || !showGround))
+                    this.hide(i);
+            }
+            this.show(uuid);
+        }
+    }
+
     hide(uuid) {
         if (uuid in this.objects) {
             this.objects[uuid].show = false;
             this.scene.remove(this.objects[uuid].obj);
+        }
+    }
+
+    hideAll() {
+        const showGround = this.groundPlane.show;
+        for (const uuid in this.objects) {
+            if (uuid != this.groundPlane.uuid || !showGround)
+                this.hide(uuid);
         }
     }
 
@@ -377,8 +472,9 @@ class Vis3D {
     }
 }
 
-class Vis3DClient {
+class Vis3DClient extends EventTarget {
     constructor(vis3d, host=undefined, port=undefined) {
+        super();
         this.vis3d = vis3d;
         this.host = host;
         this.port = port;
@@ -393,6 +489,7 @@ class Vis3DClient {
         this.ws.onopen = (e) => this.sync();
         this.ws.onerror = (e) => console.error(e);
         this.ws.addEventListener('message', (res) => {
+            this.dispatchEvent(new Event('message'));
             let msg;
             try {
                 msg = JSON.parse(res.data);
@@ -418,7 +515,9 @@ class Vis3DClient {
                 defualt:
                     throw 'Unknown message: ' + data;
             }
+            this.dispatchEvent(new Event('change'));
         });
+        this.dispatchEvent(new Event('connect'));
     }
 
     sync() {
@@ -601,12 +700,19 @@ class Vis3DClient {
                     '<td id="' + uuid + '-type"></td>';
                 objectTable.appendChild(objectRow);
             }
-            document.getElementById(uuid + '-show').checked = obj.show;
+            const showDOM = document.getElementById(uuid + '-show')
+            showDOM.checked = obj.show;
+            showDOM.addEventListener('change', e => {
+                if (e.target.checked)
+                    vis3d.show(uuid);
+                else
+                    vis3d.hide(uuid);
+            });
             document.getElementById(uuid + '-name').innerText = obj.name;
             document.getElementById(uuid + '-type').innerText = obj.type;
         }
     }
-    vis3dClient.ws.addEventListener('message', updateObjects);
+    vis3dClient.addEventListener('change', updateObjects);
     updateObjects();
 
 })();
