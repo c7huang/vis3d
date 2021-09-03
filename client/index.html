@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Vis3D Client</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        .float-right {
+            float: right;
+        }
+        .hide {
+            display: none;
+        }
+
+        #control-panel {
+            position: absolute;
+            right: 5px;
+            top: 5px;
+            max-height: 95%;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            background-color: rgba(30, 30, 30, 0.5);
+            color: white;
+        }
+
+        #control-panel table {
+            width: 100%;
+            padding: 0;
+        }
+
+        #control-panel .section-title {
+            text-align: left !important;
+            font-weight: bold;
+            padding-top: 15px;
+        }
+        #control-panel input {
+            color: white;
+            border-radius: 5px;
+            border-color: rgba(30, 30, 30, 0.5);
+            background-color: rgba(0, 0, 0, 0);
+        }
+        #control-panel input::-webkit-outer-spin-button,
+        #control-panel input::-webkit-inner-spin-button {
+            display: none;
+        }
+        #control-panel input[type=number] {
+            -moz-appearance: textfield;
+        }
+        #control-panel .success {
+            color: lightgreen;
+        }
+        #control-panel .error {
+            color: darkred;
+        }
+
+        .control-table td:first-child {
+            width: 110px;
+            text-align: right;
+            padding-right: 5px;
+        }
+        .control-table td {
+            width: 40px;
+        }
+        .control-table input[type=number],
+        .control-table input[type=text] {
+            width: 100%;
+        }
+        .object-table th {
+            text-align: left;
+        }
+        
+        .object-table td:first-child,
+        .object-table th:first-child {
+            width: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="vis3d"></canvas>
+    <div id="control-panel">
+        <div class="section-title">
+            FPS: <span id="fps"></span>
+            <input id="control-toggle" type="button" class="float-right" value="&#x1f53a;" style="margin-left: 15px;">
+        </div>
+        <div id="controls">
+            <table class="control-table">
+                <tr>
+                    <td colspan="4" class="section-title">Vis3D <hr></td>
+                </tr>
+                <tr>
+                    <td>Server: &nbsp;ws://</td>
+                    <td colspan="2"><input id="host" type="text" value="localhost"></td>
+                    <td>
+                        <span style="position: absolute;"><b>:</b></span>
+                        <input id="port" type="text" value="1008">
+                    </td>
+                </tr>
+                <tr>
+                    <td id="status" class="error">Disconnected</td>
+                    <td colspan="3">
+                        <input id="connect-btn" type="button" value="Connect" class="float-right">
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="4" class="section-title">Camera<hr></td>
+                </tr>
+                <tr>
+                    <td>FOV</td>
+                    <td colspan="3"><input id="camera-fov" type="number"></td>
+                </tr>
+                <tr>
+                    <td>Position</td>
+                    <td><input id="camera-x" type="number"></td>
+                    <td><input id="camera-y" type="number"></td>
+                    <td><input id="camera-z" type="number"></td>
+                </tr>
+                <tr>
+                    <td>Look at</td>
+                    <td><input id="lookat-x" type="number"></td>
+                    <td><input id="lookat-y" type="number"></td>
+                    <td><input id="lookat-z" type="number"></td>
+                </tr>
+                <tr>
+                    <td>Smooth</td>
+                    <td colspan="3"><input id="smooth" type="number"></td>
+                </tr>
+                <tr>
+                    <td>Rotate</td>
+                    <td colspan="3"><input id="autorotate" type="number"></td>
+                </tr>
+                <tr>
+                    <td colspan="4" class="section-title">Scene<hr></td>
+                </tr>
+                <tr>
+                    <td>BG color</td>
+                    <td colspan="3"><input id="bg-color" type="text"></td>
+                </tr>
+                <tr>
+                    <td>Ambient color</td>
+                    <td colspan="3"><input id="ambient-color" type="text"></td>
+                </tr>
+                <tr>
+                    <td>Intensity</td>
+                    <td colspan="3"><input id="ambient-intensity" type="text"></td>
+                </tr>
+                <tr>
+                    <td>Light color</td>
+                    <td colspan="3"><input id="light-color" type="text"></td>
+                </tr>
+                <tr>
+                    <td>Intensity</td>
+                    <td colspan="3"><input id="light-intensity" type="text"></td>
+                </tr>
+            </table>
+
+            <div class="section-title">Objects <hr></div>
+            <table id="object-table">
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Type</th>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.1.0/uuidv4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r127/three.min.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
