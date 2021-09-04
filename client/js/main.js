@@ -321,17 +321,20 @@ class Vis3D {
         return new THREE.Points(geometry, material);
     }
 
-    makeBBox7(data) {
+    makeBox(box) {
         /**
-         * (x, y, z, xs, ys, zs, rot_z)
+         * data: (x,y,z,xs,ys,zs,rot_x,rot_y,rot_z)
+         * color, opacity, linewidth, direction
+         * dashed, scale, dashsize, gapsize
          */
-        const bbox = data.bbox;
-        const geometry = new THREE.BufferGeometry();
-        const x = bbox[0], y = bbox[1], z = bbox[2],
-              xs2 = bbox[3]/2, ys2 = bbox[4]/2, zs2 = bbox[5]/2, rot = data[6];
-        const xmin = x - xs2, xmax = x + xs2,
-              ymin = y - ys2, ymax = y + ys2,
-              zmin = z - zs2, zmax = z + zs2;
+        const boxObject = new THREE.Group();
+        const data = box.data;
+        const x = data[0], y = data[1], z = data[2],
+              xs = data[3], ys = data[4], zs = data[5],
+              rotx = box[6], roty = box[7], rotz = box[8];
+        const xmin = -xs/2, xmax = xs/2,
+              ymin = -ys/2, ymax = ys/2,
+              zmin = -zs/2, zmax = zs/2;
         const vertices = new Float32Array([
             xmin, ymin, zmin, xmax, ymin, zmin,
             xmax, ymin, zmin, xmax, ymax, zmin,
@@ -346,24 +349,64 @@ class Vis3D {
             xmax, ymax, zmin, xmax, ymax, zmax,
             xmin, ymax, zmin, xmin, ymax, zmax
         ]);
-        geometry.setAttribute('position', vertices);
-        geometry.rotateZ(rot);
-        let material;
-        if (data.dashed) {
-            material = new LineDashedMaterial({
-                color: this.getColor(data.color),
-                linewidth: data.linewidth,
-                scale: data.scale,
-                dashSize: data.dashsize,
-                gapSize: data.gapsize
+
+        const boxFrameGeometry = new THREE.BufferGeometry();
+        boxFrameGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        boxFrameGeometry.rotation.set(rotx, roty, rotz)
+        boxFrameGeometry.position.set(x, y, z)
+        let boxFrameMaterial;
+        if (box.dashed === true) {
+            boxFrameMaterial = new THREE.LineDashedMaterial({
+                color: this.getColor(box.color),
+                linewidth: box.linewidth,
+                scale: box.scale,
+                dashSize: box.dashsize,
+                gapSize: box.gapsize
             })
         } else {
-            material = new LineBasicMaterial({
-                color: this.getColor(data.color),
-                linewidth: data.linewidth
+            boxFrameMaterial = new THREE.LineBasicMaterial({
+                color: this.getColor(box.color),
+                linewidth: box.linewidth
             })
         }
-        return new LineSegments(geometry, material);
+
+        boxObject.add( new THREE.LineSegments(boxFrameGeometry, boxFrameMaterial) );
+
+        if (box.opacity > 0) {
+            box.opacity = Math.min(box.opacity, 1);
+            const boxGeometry = new THREE.BoxGeometry(xs, ys, zs);
+            boxGeometry.rotation.set(rotx, roty, rotz);
+            boxGeometry.position.set(x, y, z);
+            const boxMaterial = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: box.opacity,
+                color: this.getColor(box.color)
+            });
+            boxObject.add( new THREE.Mesh(boxGeometry, boxMaterial) );
+        }
+
+        if (box.direction !== false) {
+            const arrowShape = new THREE.Shape();
+            arrowShape.moveTo( xmin, ymin/2 );
+            arrowShape.lineTo( xmax/2, ymin/2 );
+            arrowShape.lineTo( xmax/2, ymin );
+            arrowShape.lineTo( xmax, 0 );
+            arrowShape.lineTo( xmax/2, ymax );
+            arrowShape.lineTo( xmax/2, ymax/2 );
+            arrowShape.lineTo( xmin, ymax/2 );
+            arrowShape.lineTo( xmin, ymin/2 );
+            const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
+            arrowGeometry.rotation.set(rotx, roty, rotz);
+            arrowGeometry.position.set(x, y, zmax);
+            const arrowMaterial = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: box.opacity + (1-box.opacity)/2,
+                color: this.getColor(box.color)
+            });
+            boxObject.add( new THREE.Mesh(arrowGeometry, arrowMaterial) );
+        }
+
+        return boxObject;
     }
 
     makeObject(obj) {

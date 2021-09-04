@@ -45,14 +45,16 @@ class PointCloud(Vis3DObject):
         return obj_dict
 
 
-class BBox7(Vis3DObject):
-    def __init__(self, bbox, color=0xffffff, linewidth=1, 
+class Box(Vis3DObject):
+    def __init__(self, data, color=0xffffff, opacity=0, linewidth=1, direction=False,
                  dashed=False, scale=1, dashsize=3, gapsize=1,
                  *args, **kwargs):
         super().__init__('BBox7', *args, **kwargs)
-        self.bbox = bbox
+        self.bbox = data
         self.color = color
+        self.opacity = opacity
         self.linewidth = linewidth
+        self.direction = direction
         self.dashed = dashed
         self.scale = scale
         self.dashsize = dashsize
@@ -61,9 +63,11 @@ class BBox7(Vis3DObject):
     def todict(self):
         obj_dict = super().todict()
         obj_dict['data'] = dict(
-            bbox=self.bbox.tolist() if isinstance(self.bbox, np.ndarray) else self.bbox,
+            data=self.bbox.tolist() if isinstance(self.bbox, np.ndarray) else self.bbox,
             color=self.color,
+            opacity=self.opacity,
             linewidth=self.linewidth,
+            direction=self.direction,
             dashed=self.dashed
         )
         if self.dashed:
@@ -72,6 +76,7 @@ class BBox7(Vis3DObject):
                 dashsize=self.dashsize,
                 gapsize=self.gapsize
             ))
+        return obj_dict
 
 
 class Vis3DManager():
