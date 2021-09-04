@@ -323,19 +323,23 @@ class Vis3D {
 
     makeBox(box) {
         /**
-         * data: (x,y,z,xs,ys,zs,rot_x,rot_y,rot_z)
+         * data: (x,y,z,xs,ys,zs,yaw,pitch,roll)
          * color, opacity, linewidth, direction
          * dashed, scale, dashsize, gapsize
          */
         const boxObject = new THREE.Group();
         const data = box.data;
+        const boxColor = this.getColor(box.color);
         const x = data[0], y = data[1], z = data[2],
               xs = data[3], ys = data[4], zs = data[5],
-              rotx = box[6], roty = box[7], rotz = box[8];
+              yaw = data[6] === undefined ? 0 : data[6],
+              pitch = data[7] === undefined ? 0 : data[7],
+              roll = data[8] === undefined ? 0 : data[8];
         const xmin = -xs/2, xmax = xs/2,
               ymin = -ys/2, ymax = ys/2,
               zmin = -zs/2, zmax = zs/2;
-        const vertices = new Float32Array([
+
+        const boxFrameVertices = new Float32Array([
             xmin, ymin, zmin, xmax, ymin, zmin,
             xmax, ymin, zmin, xmax, ymax, zmin,
             xmax, ymax, zmin, xmin, ymax, zmin,
@@ -349,15 +353,14 @@ class Vis3D {
             xmax, ymax, zmin, xmax, ymax, zmax,
             xmin, ymax, zmin, xmin, ymax, zmax
         ]);
-
         const boxFrameGeometry = new THREE.BufferGeometry();
-        boxFrameGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-        boxFrameGeometry.rotation.set(rotx, roty, rotz)
-        boxFrameGeometry.position.set(x, y, z)
+        boxFrameGeometry.setAttribute(
+            'position', new THREE.BufferAttribute(boxFrameVertices, 3)
+        );
         let boxFrameMaterial;
         if (box.dashed === true) {
             boxFrameMaterial = new THREE.LineDashedMaterial({
-                color: this.getColor(box.color),
+                color: boxColor,
                 linewidth: box.linewidth,
                 scale: box.scale,
                 dashSize: box.dashsize,
@@ -365,45 +368,59 @@ class Vis3D {
             })
         } else {
             boxFrameMaterial = new THREE.LineBasicMaterial({
-                color: this.getColor(box.color),
+                color: boxColor,
                 linewidth: box.linewidth
             })
         }
-
-        boxObject.add( new THREE.LineSegments(boxFrameGeometry, boxFrameMaterial) );
+        const boxFrameMesh = new THREE.LineSegments(boxFrameGeometry, boxFrameMaterial);
+        boxFrameMesh.rotation.set(roll, pitch, yaw, 'ZYX');
+        boxFrameMesh.position.set(x, y, z);
+        boxObject.add( boxFrameMesh );
 
         if (box.opacity > 0) {
             box.opacity = Math.min(box.opacity, 1);
             const boxGeometry = new THREE.BoxGeometry(xs, ys, zs);
-            boxGeometry.rotation.set(rotx, roty, rotz);
-            boxGeometry.position.set(x, y, z);
             const boxMaterial = new THREE.MeshBasicMaterial({
                 transparent: true,
                 opacity: box.opacity,
-                color: this.getColor(box.color)
+                color: boxColor
             });
-            boxObject.add( new THREE.Mesh(boxGeometry, boxMaterial) );
+            boxMaterial.ztest = false;
+            const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
+            boxMesh.rotation.set(roll, pitch, yaw, 'ZYX');
+            boxMesh.position.set(x, y, z);
+            boxObject.add(boxMesh);
         }
 
         if (box.direction !== false) {
+            console.log('arrow')
             const arrowShape = new THREE.Shape();
-            arrowShape.moveTo( xmin, ymin/2 );
-            arrowShape.lineTo( xmax/2, ymin/2 );
-            arrowShape.lineTo( xmax/2, ymin );
-            arrowShape.lineTo( xmax, 0 );
-            arrowShape.lineTo( xmax/2, ymax );
-            arrowShape.lineTo( xmax/2, ymax/2 );
-            arrowShape.lineTo( xmin, ymax/2 );
-            arrowShape.lineTo( xmin, ymin/2 );
+            arrowShape.moveTo( 0.8*xmin, 0.3*ymin );
+            arrowShape.lineTo( 0.3*xmax, 0.3*ymin );
+            arrowShape.lineTo( 0.3*xmax, 0.8*ymin );
+            arrowShape.lineTo( 0.8*xmax, 0 );
+            arrowShape.lineTo( 0.3*xmax, 0.8*ymax );
+            arrowShape.lineTo( 0.3*xmax, 0.3*ymax );
+            arrowShape.lineTo( 0.8*xmin, 0.3*ymax );
+            arrowShape.lineTo( 0.8*xmin, 0.3*ymin );
             const arrowGeometry = new THREE.ShapeGeometry(arrowShape);
-            arrowGeometry.rotation.set(rotx, roty, rotz);
-            arrowGeometry.position.set(x, y, zmax);
+            const arrowColor = new THREE.Color(boxColor.getHex() ^ 0xffffff);
+            arrowColor.setRGB(
+                (arrowColor.r - boxColor.r)*0.3 + boxColor.r,
+                (arrowColor.g - boxColor.g)*0.3 + boxColor.g,
+                (arrowColor.b - boxColor.b)*0.3 + boxColor.b,
+            );
             const arrowMaterial = new THREE.MeshBasicMaterial({
                 transparent: true,
                 opacity: box.opacity + (1-box.opacity)/2,
-                color: this.getColor(box.color)
+                color: arrowColor
             });
-            boxObject.add( new THREE.Mesh(arrowGeometry, arrowMaterial) );
+            arrowMaterial.side = THREE.DoubleSide;
+            arrowMaterial.ztest = false;
+            const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
+            arrowMesh.rotation.set(roll, pitch, yaw, 'ZYX');
+            arrowMesh.position.set(x, y, z+zmax+0.001);
+            boxObject.add(arrowMesh);
         }
 
         return boxObject;
@@ -421,7 +438,7 @@ class Vis3D {
                 obj.obj = this.makePointCloud(obj.data);
                 break;
             case 'BBox7':
-                obj.obj = this.makeBBox7(obj.data);
+                obj.obj = this.makeBox(obj.data);
                 break;
             default:
                 throw 'Unknown object type: ' + obj.type;
