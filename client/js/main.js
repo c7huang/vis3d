@@ -161,27 +161,6 @@ class CameraController {
     }
 }
 
-class FPSCounter {
-    constructor(interval=60) {
-        this.fps = 0;
-        this.interval = interval;
-        this._start = Date.now();
-        this._i = 0;
-    }
-
-    update() {
-        if (this._i > this.interval) {
-            this._i = 0;
-            this.fps = 1000 / (Date.now() - this._start) * this.interval;
-            this._start = Date.now();
-        } else {
-            this._i += 1;
-        }
-    }
-}
-
-
-
 class Vis3D {
     constructor( config=defaultConfig ) {
         config = { ...defaultConfig, ...config }
@@ -244,7 +223,7 @@ class Vis3D {
         this.add(this.groundPlane);
         this.add(this.defaultCube);
 
-        this.fpsCounter = new FPSCounter(config.fpsInterval);
+        this.stats = new Stats();
 
         /**
          * Connect to server
@@ -281,7 +260,7 @@ class Vis3D {
             'position', new THREE.BufferAttribute(newPosition, 3)
         );
         const line = new THREE.LineSegments( wireframe );
-        line.material.ztest = false;
+        line.material.depthTest = false;
         line.material.opacity = 0.1;
         line.material.transparent = true;
         return line;
@@ -359,10 +338,11 @@ class Vis3D {
         );
         let boxFrameMaterial;
         if (box.dashed === true) {
+            console.log(box.dashsize, box.gapsize)
             boxFrameMaterial = new THREE.LineDashedMaterial({
                 color: boxColor,
                 linewidth: box.linewidth,
-                scale: box.scale,
+                // scale: box.scale,
                 dashSize: box.dashsize,
                 gapSize: box.gapsize
             })
@@ -375,6 +355,7 @@ class Vis3D {
         const boxFrameMesh = new THREE.LineSegments(boxFrameGeometry, boxFrameMaterial);
         boxFrameMesh.rotation.set(roll, pitch, yaw, 'ZYX');
         boxFrameMesh.position.set(x, y, z);
+        boxFrameMesh.computeLineDistances();
         boxObject.add( boxFrameMesh );
 
         if (box.opacity > 0) {
@@ -383,9 +364,9 @@ class Vis3D {
             const boxMaterial = new THREE.MeshBasicMaterial({
                 transparent: true,
                 opacity: box.opacity,
-                color: boxColor
+                color: boxColor,
+                depthTest: false
             });
-            boxMaterial.ztest = false;
             const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
             boxMesh.rotation.set(roll, pitch, yaw, 'ZYX');
             boxMesh.position.set(x, y, z);
@@ -412,10 +393,10 @@ class Vis3D {
             const arrowMaterial = new THREE.MeshBasicMaterial({
                 transparent: true,
                 opacity: box.opacity + (1-box.opacity)/2,
-                color: arrowColor
+                color: arrowColor,
+                side: THREE.DoubleSide,
+                depthTest: false
             });
-            arrowMaterial.side = THREE.DoubleSide;
-            arrowMaterial.ztest = false;
             const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
             arrowMesh.rotation.set(roll, pitch, yaw, 'ZYX');
             arrowMesh.position.set(x, y, z+zmax+0.001);
@@ -523,11 +504,13 @@ class Vis3D {
     }
 
     render() {
-        requestAnimationFrame( () => this.render() );
+        this.stats.begin();
         this.cameraController.update();
         this.updateDirectionalLight();
         this.renderer.render(this.scene, this.cameraController.camera);
-        this.fpsCounter.update();
+        this.stats.end();
+        requestAnimationFrame( () => this.render() );
+        // this.fpsCounter.update();
     }
 }
 
@@ -597,6 +580,9 @@ class Vis3DClient extends EventTarget {
     vis3d.render();
     window.vis3d = vis3d;
     window.vis3dClient = vis3dClient;
+    
+    vis3d.stats.dom.style = "float: left; cursor: pointer; opacity: 0.8;";
+    document.getElementById('fps').appendChild(vis3d.stats.dom);
 
     const windowResize = e => {
         canvas.width = window.innerWidth;
@@ -607,10 +593,6 @@ class Vis3DClient extends EventTarget {
     };
     window.addEventListener('resize', windowResize);
     windowResize();
-
-    setInterval(() => {
-        document.getElementById('fps').innerText = vis3d.fpsCounter.fps.toFixed(0);
-    }, 1000);
 
 
     function updateControl() {
