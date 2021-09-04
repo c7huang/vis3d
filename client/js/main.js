@@ -393,7 +393,6 @@ class Vis3D {
         }
 
         if (box.direction !== false) {
-            console.log('arrow')
             const arrowShape = new THREE.Shape();
             arrowShape.moveTo( 0.8*xmin, 0.3*ymin );
             arrowShape.lineTo( 0.3*xmax, 0.3*ymin );
@@ -738,14 +737,17 @@ class Vis3DClient extends EventTarget {
         const objectTable = document.getElementById('object-table');
         const objectDOMs = document.getElementsByClassName('object-row');
         const objectDOMMap = {};
+        const removeIDs = []
         for (let i = 0; i < objectDOMs.length; ++i) {
             const objectDOM = objectDOMs[i];
             if (vis3d.objects[objectDOM.id] === undefined) {
-                objectDOM.remove();
+                removeIDs.push(objectDOM.id);
             } else {
                 objectDOMMap[objectDOM.id] = objectDOM;
             }
         }
+        for (let i = 0; i < removeIDs.length; ++i)
+            document.getElementById(removeIDs[i]).remove();
 
         for (const uuid in vis3d.objects) {
             const obj = vis3d.objects[uuid];
