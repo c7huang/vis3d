@@ -49,7 +49,7 @@ class Box(Vis3DObject):
     def __init__(self, data, color=0xffffff, opacity=0, linewidth=1, direction=False,
                  dashed=False, scale=1, dashsize=3, gapsize=1,
                  *args, **kwargs):
-        super().__init__('BBox7', *args, **kwargs)
+        super().__init__('Box', *args, **kwargs)
         self.bbox = data
         self.color = color
         self.opacity = opacity

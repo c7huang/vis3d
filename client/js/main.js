@@ -436,7 +436,7 @@ class Vis3D {
             case 'PointCloud':
                 obj.obj = this.makePointCloud(obj.data);
                 break;
-            case 'BBox7':
+            case 'Box':
                 obj.obj = this.makeBox(obj.data);
                 break;
             default:
